@@ -1,0 +1,166 @@
+================================================================
+ KSIĄŻKA KUCHARSKA — INSTALACJA NA NOWYM KOMPUTERZE (OD ZERA)
+================================================================
+
+Ta instrukcja zakłada, że na nowym komputerze NIE MA jeszcze
+niczego zainstalowanego — ani Node.js, ani samej aplikacji.
+Wykonaj poniższe kroki po kolei.
+
+Cały proces to jednorazowa operacja. Po zbudowaniu pliku .exe
+(krok 5) nie musisz już nigdy więcej instalować Node.js na tym
+komputerze ani używać terminala — chyba że będziesz chciał
+zaktualizować aplikację o nowe funkcje w przyszłości.
+
+
+----------------------------------------------------------------
+KROK 1: Zainstaluj Node.js
+----------------------------------------------------------------
+
+Node.js to darmowe narzędzie, które jest potrzebne, żeby zbudować
+aplikację z plików źródłowych. Bez niego nie da się stworzyć
+pliku .exe.
+
+1. Wejdź na stronę: https://nodejs.org
+2. Pobierz wersję oznaczoną jako "LTS" (zalecana, bardziej
+   stabilna) — to duży, zielony przycisk na stronie głównej.
+3. Uruchom pobrany instalator (.msi).
+4. Klikaj "Next" / "Dalej" przy każdym kroku — domyślne
+   ustawienia są w porządku, nic nie trzeba zmieniać.
+5. Na końcu kliknij "Install", a potem "Finish".
+6. Uruchom ponownie komputer (zalecane, choć nie zawsze
+   konieczne) — to gwarantuje, że system poprawnie rozpozna
+   nowo zainstalowane narzędzia.
+
+
+----------------------------------------------------------------
+KROK 2: Sprawdź, czy Node.js się zainstalował poprawnie
+----------------------------------------------------------------
+
+1. Otwórz PowerShell: kliknij Start, wpisz "PowerShell",
+   naciśnij Enter.
+2. Wpisz poniższą komendę i naciśnij Enter:
+
+   node -v
+
+3. Powinieneś zobaczyć numer wersji, np. "v20.11.0".
+   Jeśli zamiast tego pojawi się błąd ("nie jest rozpoznawane
+   jako polecenie..."), zrestartuj komputer i spróbuj ponownie.
+
+
+----------------------------------------------------------------
+KROK 3: Rozpakuj pliki aplikacji
+----------------------------------------------------------------
+
+1. Skopiuj na nowy komputer plik .zip z projektem aplikacji
+   (ten, który dostałeś ode mnie) — np. przez pendrive, e-mail
+   albo dysk w chmurze (Google Drive, OneDrive).
+2. Kliknij na plik .zip prawym przyciskiem myszy i wybierz
+   "Wypakuj wszystkie..." / "Extract All...".
+3. Wypakuj go w wygodne miejsce, np. na Pulpit lub do folderu
+   Dokumenty. Zapamiętaj, gdzie go zapisałeś — nazwijmy ten
+   folder "folder projektu".
+
+   W folderze projektu powinny znaleźć się m.in. takie pliki:
+   main.js, preload.js, package.json, folder "renderer",
+   folder "build".
+
+
+----------------------------------------------------------------
+KROK 4: Zainstaluj zależności aplikacji
+----------------------------------------------------------------
+
+1. Otwórz folder projektu w Eksploratorze plików.
+2. Kliknij w puste miejsce na pasku adresu na górze okna
+   (tam gdzie widać ścieżkę do folderu), wpisz "powershell"
+   i naciśnij Enter — to otworzy PowerShell od razu we
+   właściwym folderze.
+3. Wpisz poniższą komendę i naciśnij Enter:
+
+   npm install
+
+4. Poczekaj, aż terminal skończy pracę (może to potrwać kilka
+   minut przy pierwszym razie — pobierane są wszystkie
+   potrzebne biblioteki). Zobaczysz sporo tekstu przelatującego
+   w oknie — to normalne.
+5. Jeśli na końcu pojawi się komunikat o podatnościach
+   (np. "X vulnerabilities") — to normalne i można to
+   zignorować, dotyczy tylko narzędzi używanych do budowania,
+   nie samej aplikacji.
+
+
+----------------------------------------------------------------
+KROK 5: Zbuduj gotowy plik .exe
+----------------------------------------------------------------
+
+1. W tym samym oknie PowerShell wpisz:
+
+   npm run dist
+
+2. Poczekaj, aż proces się zakończy (kilka minut przy
+   pierwszym razie).
+3. Po zakończeniu, w folderze projektu pojawi się nowy
+   podfolder o nazwie "dist". Wejdź do niego.
+4. Znajdziesz tam plik: KsiazkaKucharska.exe
+   To jest Twoja gotowa aplikacja.
+
+
+----------------------------------------------------------------
+KROK 6: Uruchom aplikację
+----------------------------------------------------------------
+
+1. Kliknij dwukrotnie na KsiazkaKucharska.exe.
+2. Windows może pokazać niebieskie okno z ostrzeżeniem
+   "Windows ochronił Twój komputer" / "Nieznany wydawca".
+   To NORMALNE — aplikacja nie ma płatnego certyfikatu
+   od Microsoftu, ale jest bezpieczna (sam ją zbudowałeś
+   z własnych plików źródłowych).
+   Kliknij "Więcej informacji", a potem "Uruchom mimo to".
+3. Aplikacja powinna się otworzyć.
+
+Plik KsiazkaKucharska.exe możesz teraz swobodnie przenieść
+w dowolne miejsce — np. na Pulpit — i uruchamiać go stamtąd.
+Od tego momentu nie potrzebujesz już terminala.
+
+
+----------------------------------------------------------------
+GDZIE SĄ ZAPISYWANE TWOJE PRZEPISY
+----------------------------------------------------------------
+
+Dane (przepisy, przelicznik miar) zapisują się automatycznie
+w folderze danych aplikacji, np.:
+
+C:\\Users\\TwojaNazwaUżytkownika\\AppData\\Roaming\\ksiazka-kucharska\\
+
+Jeśli chcesz przenieść swoje przepisy z jednego komputera na
+drugi, skopiuj z tego folderu pliki:
+- przepisy.json
+- przelicznik-miar.json
+i wklej je do tego samego folderu na nowym komputerze
+(PRZED pierwszym uruchomieniem aplikacji na nowym komputerze,
+żeby nie zostały nadpisane domyślnymi danymi).
+
+
+----------------------------------------------------------------
+CZĘSTE PROBLEMY
+----------------------------------------------------------------
+
+PROBLEM: "npm nie jest rozpoznawane jako polecenie wewnętrzne..."
+ROZWIĄZANIE: Node.js nie zainstalował się poprawnie albo
+komputer nie został zrestartowany po instalacji. Wróć do
+kroku 1, zainstaluj ponownie i zrestartuj komputer.
+
+PROBLEM: Podczas "npm install" pojawia się błąd związany
+z "electron" / "postinstall" / "allow-scripts".
+ROZWIĄZANIE: W tym samym oknie PowerShell wpisz:
+   npm approve-scripts electron
+i naciśnij Enter, a potem uruchom "npm install" jeszcze raz.
+
+PROBLEM: Po "npm run dist" nie widać folderu "dist".
+ROZWIĄZANIE: Sprawdź, czy w oknie PowerShell nie pojawił się
+czerwony komunikat o błędzie — jeśli tak, zrób zrzut ekranu
+i prześlij mi go, sprawdzę co poszło nie tak.
+
+
+================================================================
+Koniec instrukcji.
+================================================================
