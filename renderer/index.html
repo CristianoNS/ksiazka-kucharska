@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Książka Kucharska</title>
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="icon.png" alt="" class="brand-mark">
+      <span class="brand-name">Przepisy</span>
+    </div>
+
+    <nav class="cat-list" id="catList">
+      <button class="cat-item" data-cat="przelicznik">
+        <span class="cat-icon" data-icon="ruler"></span> Przelicznik miar
+      </button>
+      <div class="cat-divider"></div>
+      <button class="cat-item active" data-cat="wszystkie">
+        <span class="cat-icon" data-icon="all"></span> Wszystkie
+      </button>
+      <button class="cat-item" data-cat="ulubione">
+        <span class="cat-icon cat-icon-star" data-icon="fav">★</span> Ulubione
+      </button>
+      <div class="cat-divider"></div>
+      <div id="catTree"></div>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <div class="topbar">
+      <input type="search" id="searchInput" placeholder="Szukaj przepisu…" class="search">
+      <select id="sortSelect" class="sort-select">
+        <option value="new">Najnowsze</option>
+        <option value="az">Alfabetycznie A–Z</option>
+        <option value="fav">Ulubione najpierw</option>
+      </select>
+      <button class="btn-primary" id="addBtn">+ Dodaj przepis</button>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="emptyState" hidden>
+      <p>Brak przepisów w tej kategorii.</p>
+    </div>
+
+    <div class="converter-view" id="converterView" hidden>
+      <div class="converter-head">
+        <div>
+          <h2>Przelicznik miar i wag</h2>
+          <p class="converter-sub">Ile gramów mieści szklanka (250 ml), łyżka (15 ml) i łyżeczka (5 ml). Wartości możesz dowolnie edytować.</p>
+        </div>
+        <button class="btn-primary" id="converterAddBtn">+ Dodaj produkt</button>
+      </div>
+      <div class="converter-table-wrap">
+        <table class="converter-table">
+          <thead>
+            <tr>
+              <th>Produkt</th>
+              <th>Szklanka – 250 ml</th>
+              <th>Łyżka – 15 ml</th>
+              <th>Łyżeczka – 5 ml</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="converterBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="converterEmpty" hidden>
+        <p>Brak pasujących produktów.</p>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<!-- MODAL: widok przepisu -->
+<div class="modal-overlay" id="viewOverlay">
+  <div class="modal" id="viewModal"></div>
+</div>
+
+<!-- MODAL: dodawanie przepisu -->
+<div class="modal-overlay" id="addOverlay">
+  <div class="modal modal-form">
+    <div class="modal-head">
+      <h2 id="formTitle">Nowy przepis</h2>
+      <button class="icon-btn" id="closeAdd">✕</button>
+    </div>
+    <form id="recipeForm">
+      <input type="hidden" id="f-id">
+      <div class="field">
+        <label>Tytuł <span class="required-star">*</span></label>
+        <input type="text" id="f-title" required>
+      </div>
+      <div class="field-row-3">
+        <div class="field">
+          <label>Kategoria <span class="required-star">*</span></label>
+          <select id="f-cat" required>
+            <option value="" disabled selected>Wybierz kategorię</option>
+            <option value="sniadania">Śniadania</option>
+            <option value="zupy">Zupy</option>
+            <option value="dania-glowne">Dania główne</option>
+            <option value="desery">Desery</option>
+            <option value="napoje">Napoje</option>
+            <option value="dodatki">Dodatki</option>
+            <option value="przetwory">Przetwory</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Podkategoria <span class="required-star">*</span></label>
+          <select id="f-subcat" required></select>
+        </div>
+        <div class="field">
+          <label>Czas przygotowania</label>
+          <input type="text" id="f-time" placeholder="np. 40 min">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Krótki opis</label>
+          <input type="text" id="f-desc" placeholder="jedno zdanie">
+        </div>
+        <div class="field">
+          <label>Porcje (bazowo)</label>
+          <input type="number" id="f-servings" min="1" max="50" value="4">
+        </div>
+      </div>
+      <div class="field">
+        <label>Składniki <span class="hint">(jeden na linię)</span></label>
+        <textarea id="f-ing" placeholder="500 g mąki&#10;2 jajka&#10;szczypta soli"></textarea>
+      </div>
+      <div class="field">
+        <label>Sposób przygotowania <span class="hint">(jeden krok na linię)</span></label>
+        <textarea id="f-steps" placeholder="Wymieszaj składniki suche.&#10;Dodaj jajka i wyrób ciasto."></textarea>
+      </div>
+      <div class="field">
+        <label>Notatki własne <span class="hint">(opcjonalnie)</span></label>
+        <textarea id="f-notes" placeholder="np. następnym razem mniej soli"></textarea>
+      </div>
+      <p class="required-note"><span class="required-star">*</span> pola wymagane</p>
+      <button type="submit" class="btn-primary btn-block">Zapisz przepis</button>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: dodawanie/edycja produktu w przeliczniku -->
+<div class="modal-overlay" id="converterFormOverlay">
+  <div class="modal modal-form">
+    <div class="modal-head">
+      <h2 id="converterFormTitle">Nowy produkt</h2>
+      <button class="icon-btn" id="closeConverterForm">✕</button>
+    </div>
+    <form id="converterForm">
+      <input type="hidden" id="cf-id">
+      <div class="field">
+        <label>Nazwa produktu</label>
+        <input type="text" id="cf-name" required placeholder="np. Mąka kokosowa">
+      </div>
+      <div class="field-row-3">
+        <div class="field">
+          <label>Szklanka – 250 ml</label>
+          <input type="text" id="cf-cup" placeholder="np. 120 g">
+        </div>
+        <div class="field">
+          <label>Łyżka – 15 ml</label>
+          <input type="text" id="cf-tbsp" placeholder="np. 8 g">
+        </div>
+        <div class="field">
+          <label>Łyżeczka – 5 ml</label>
+          <input type="text" id="cf-tsp" placeholder="np. 3 g">
+        </div>
+      </div>
+      <button type="submit" class="btn-primary btn-block">Zapisz produkt</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
