@@ -1,6 +1,6 @@
 {
   "name": "ksiazka-kucharska",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Aplikacja desktopowa do przechowywania przepisów kulinarnych",
   "main": "main.js",
   "author": "Ty",
@@ -24,6 +24,7 @@
       "output": "dist"
     },
     "files": [
+      "common.js",
       "main.js",
       "preload.js",
       "renderer/**/*",
@@ -32,7 +33,7 @@
     "win": {
       "target": "portable",
       "icon": "build/icon.ico",
-      "artifactName": "KsiazkaKucharska.exe"
+      "artifactName": "Książka Kucharska.exe"
     }
   }
 }
