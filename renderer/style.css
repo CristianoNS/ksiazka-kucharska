@@ -45,6 +45,11 @@ h1,h2,h3{font-family:'Manrope', sans-serif;}
   padding:24px 16px;
   overflow-y:auto;
   overflow-x:hidden;
+  scrollbar-width:none;      /* Firefox */
+  -ms-overflow-style:none;   /* starsze Edge/IE */
+}
+.sidebar::-webkit-scrollbar{
+  display:none;              /* Chrome/Edge/Electron */
 }
 .brand{
   display:flex;
@@ -107,11 +112,13 @@ h1,h2,h3{font-family:'Manrope', sans-serif;}
 .cat-icon-star{
   background:none !important;
   color:#D9A441;
-  font-size:11px;
+  font-size:15px;
   width:8px; height:8px;
-  display:inline-flex;
+  display:flex;
   align-items:center;
   justify-content:center;
+  overflow:visible;
+  transform:translateY(-1.5px);
 }
 .cat-divider{height:1px; background:var(--border); margin:8px 6px 10px;}
 
