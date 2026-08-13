@@ -1,57 +1,7 @@
-const CAT_LABELS = {
-  sniadania: 'Śniadania', zupy: 'Zupy', 'dania-glowne': 'Dania główne',
-  desery: 'Desery', napoje: 'Napoje', dodatki: 'Dodatki', przetwory: 'Przetwory'
-};
-
-const SUBCATS = {
-  sniadania: [
-    { key: 'na-slodko', label: 'Na słodko' },
-    { key: 'na-slono', label: 'Na słono' },
-    { key: 'szybkie', label: 'Szybkie (do 10 min)' }
-  ],
-  zupy: [
-    { key: 'kremy', label: 'Kremy' },
-    { key: 'klasyczne', label: 'Zupy klasyczne' },
-    { key: 'chlodniki', label: 'Chłodniki' }
-  ],
-  'dania-glowne': [
-    { key: 'miesne', label: 'Mięsne' },
-    { key: 'rybne', label: 'Rybne' },
-    { key: 'wege', label: 'Wegetariańskie i wegańskie' },
-    { key: 'makarony', label: 'Makarony i pasty' },
-    { key: 'zapiekanki', label: 'Zapiekanki' }
-  ],
-  desery: [
-    { key: 'ciasta', label: 'Ciasta i torty' },
-    { key: 'ciastka', label: 'Ciastka i drobne wypieki' },
-    { key: 'na-zimno', label: 'Desery na zimno (musy, lody)' },
-    { key: 'bez-pieczenia', label: 'Bez pieczenia' }
-  ],
-  napoje: [
-    { key: 'gorace', label: 'Gorące (kawa, herbata)' },
-    { key: 'zimne', label: 'Zimne i orzeźwiające' },
-    { key: 'koktajle', label: 'Koktajle i drinki' },
-    { key: 'smoothie', label: 'Smoothie i soki' }
-  ],
-  dodatki: [
-    { key: 'sosy', label: 'Sosy' },
-    { key: 'surowki', label: 'Surówki i sałatki' },
-    { key: 'pieczywo', label: 'Pieczywo i podpłomyki' },
-    { key: 'przekaski', label: 'Przekąski' }
-  ],
-  przetwory: [
-    { key: 'dzemy', label: 'Dżemy i konfitury' },
-    { key: 'kiszonki', label: 'Kiszonki' },
-    { key: 'marynaty', label: 'Marynaty' },
-    { key: 'soki', label: 'Soki i syropy' }
-  ]
-};
-
-function subcatLabel(cat, subcat) {
-  if (!subcat) return '';
-  const item = (SUBCATS[cat] || []).find(s => s.key === subcat);
-  return item ? item.label : '';
-}
+/* Nazwy kategorii, podkategorii i formatowanie czasu pochodzą ze wspólnego
+   pliku common.js, z którego korzysta też proces główny (eksport PDF/DOCX).
+   Wcześniej te dane były zdublowane i groziło im rozjechanie się. */
+const { CAT_LABELS, SUBCATS, subcatLabel, normalizeTime, makeId } = window.KKCommon;
 
 function renderCatTree() {
   const container = document.getElementById('catTree');
@@ -104,10 +54,73 @@ let activeSubcat = null;
 let expandedCats = new Set();
 let searchTerm = '';
 let sortMode = 'new';
+let stanAplikacji = { tylkoOdczyt: false, folderDanych: '', problemy: [] };
 
-function normalizeTime(value) {
-  if (!value) return '—';
-  return /^\d+$/.test(value) ? `${value} min` : value;
+/* --------------------------------------------------------------------------
+   BEZPIECZNY ZAPIS
+   Wcześniej wynik zapisu był ignorowany we wszystkich miejscach: gdy dysk był
+   pełny albo folder tylko do odczytu, użytkownik widział normalny interfejs
+   i był przekonany, że przepis się zapisał. Teraz każdy zapis przechodzi
+   przez te funkcje, które pokazują wskaźnik stanu i głośno krzyczą przy
+   niepowodzeniu.
+   -------------------------------------------------------------------------- */
+
+function pokazStanZapisu(stan, tekst) {
+  const el = document.getElementById('saveStatus');
+  if (!el) return;
+  el.className = `save-status ${stan}`;
+  el.textContent = tekst;
+  el.hidden = false;
+  if (stan === 'ok') {
+    clearTimeout(pokazStanZapisu._timer);
+    pokazStanZapisu._timer = setTimeout(() => { el.hidden = true; }, 2000);
+  }
+}
+
+async function zapiszPrzepisy() {
+  pokazStanZapisu('trwa', 'Zapisywanie…');
+  let wynik;
+  try {
+    wynik = await window.api.saveRecipes(recipes);
+  } catch (err) {
+    console.error('Błąd zapisu przepisów:', err);
+    wynik = { ok: false, error: String(err) };
+  }
+  if (wynik && wynik.ok) {
+    pokazStanZapisu('ok', 'Zapisano ✓');
+    return true;
+  }
+  pokazStanZapisu('blad', 'NIE ZAPISANO');
+  await customConfirm({
+    title: 'Nie udało się zapisać',
+    message: wynik && wynik.tylkoOdczyt
+      ? 'Aplikacja działa w trybie tylko do odczytu — zmiany nie zostaną zachowane.'
+      : 'Zmiany nie zostały zapisane na dysk.',
+    detail: (wynik && wynik.error ? `Szczegóły: ${wynik.error}` : '') +
+      ' Sprawdź, czy dysk nie jest pełny i czy folder z danymi nie jest zabezpieczony przed zapisem.',
+    confirmText: 'Rozumiem',
+    cancelText: null,
+    danger: true
+  });
+  return false;
+}
+
+async function zapiszMiary() {
+  pokazStanZapisu('trwa', 'Zapisywanie…');
+  let wynik;
+  try {
+    wynik = await window.api.saveMiary(miary);
+  } catch (err) {
+    console.error('Błąd zapisu przelicznika:', err);
+    wynik = { ok: false, error: String(err) };
+  }
+  if (wynik && wynik.ok) {
+    pokazStanZapisu('ok', 'Zapisano ✓');
+    return true;
+  }
+  pokazStanZapisu('blad', 'NIE ZAPISANO');
+  showToast('Nie udało się zapisać przelicznika miar', true);
+  return false;
 }
 
 function plural(n, forms) {
@@ -140,10 +153,144 @@ const converterFormOverlay = document.getElementById('converterFormOverlay');
 const converterForm = document.getElementById('converterForm');
 
 async function init() {
-  recipes = await window.api.loadRecipes();
-  miary = await window.api.loadMiary();
-  renderCatTree();
-  render();
+  // Cały start jest w try/catch — wcześniej jakikolwiek błąd wczytywania
+  // zostawiał użytkownika z pustym białym ekranem bez wyjaśnienia.
+  try {
+    try {
+      stanAplikacji = await window.api.stanAplikacji();
+    } catch (err) {
+      console.error('Nie udało się pobrać stanu aplikacji:', err);
+    }
+
+    const odczyt = await window.api.loadRecipes();
+
+    // Plik z przepisami jest uszkodzony — pokazujemy ekran ratunkowy zamiast
+    // udawać, że baza jest pusta (co wcześniej kończyło się nadpisaniem
+    // danych przy pierwszej zmianie).
+    if (odczyt && odczyt.uszkodzony) {
+      pokazEkranRatunkowy(odczyt);
+      return;
+    }
+
+    recipes = (odczyt && odczyt.przepisy) || [];
+
+    const miaryOdczyt = await window.api.loadMiary();
+    miary = (miaryOdczyt && miaryOdczyt.miary) || [];
+
+    zastosujTrybTylkoOdczytu();
+    renderCatTree();
+    render();
+
+    // Informacja o automatycznych naprawach i problemach wykrytych przy starcie
+    const komunikaty = []
+      .concat((odczyt && odczyt.naprawy) || [])
+      .concat((stanAplikacji && stanAplikacji.problemy) || []);
+    if (komunikaty.length) {
+      await customConfirm({
+        title: 'Sprawdzenie bazy przy uruchomieniu',
+        message: 'Aplikacja wykryła i naprawiła drobne nieprawidłowości w danych:',
+        detail: komunikaty.slice(0, 8).map(t => `• ${escapeHtml(t)}`).join('<br>') +
+          (komunikaty.length > 8 ? `<br>…i jeszcze ${komunikaty.length - 8}.` : ''),
+        confirmText: 'Rozumiem',
+        cancelText: null,
+        danger: false
+      });
+    }
+  } catch (err) {
+    console.error('Błąd uruchamiania aplikacji:', err);
+    document.body.innerHTML = `
+      <div class="fatal-screen">
+        <h1>Nie udało się uruchomić aplikacji</h1>
+        <p>Wystąpił nieoczekiwany błąd podczas wczytywania danych. Twoje przepisy
+        najprawdopodobniej są bezpieczne — aplikacja trzyma kopie zapasowe.</p>
+        <p class="fatal-detail">${escapeHtml(String(err && err.message ? err.message : err))}</p>
+        <p>Spróbuj zamknąć i uruchomić program ponownie. Jeśli problem się powtarza,
+        skopiuj folder <strong>dane-aplikacji</strong> w bezpieczne miejsce.</p>
+      </div>`;
+  }
+}
+
+// Tryb tylko do odczytu — gdy nie da się pisać na dysk, blokujemy dodawanie
+// i edycję, zamiast pozwolić użytkownikowi pracować na próżno.
+function zastosujTrybTylkoOdczytu() {
+  if (!stanAplikacji || !stanAplikacji.tylkoOdczyt) return;
+  document.body.classList.add('tryb-tylko-odczyt');
+  const pasek = document.getElementById('readonlyBar');
+  if (pasek) {
+    pasek.hidden = false;
+    pasek.textContent = '⚠ Tryb tylko do odczytu — wprowadzone zmiany NIE zostaną zapisane. '
+      + (stanAplikacji.powodTylkoOdczyt || '');
+  }
+  ['addBtn', 'converterAddBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = true;
+  });
+}
+
+// Ekran ratunkowy przy uszkodzonej bazie: pokazuje dostępne kopie zapasowe
+// z datą i liczbą przepisów, żeby dało się wrócić do działającego stanu
+// bez żadnej wiedzy technicznej.
+function pokazEkranRatunkowy(odczyt) {
+  const kopie = odczyt.kopie || [];
+  const listaHtml = kopie.length
+    ? kopie.map(k => `
+        <li>
+          <div class="rescue-copy">
+            <div>
+              <strong>${formatujDate(k.data)}</strong>
+              <span class="rescue-count">${k.liczbaPrzepisow} ${plural(k.liczbaPrzepisow, ['przepis', 'przepisy', 'przepisów'])}</span>
+            </div>
+            <button class="btn-primary" data-plik="${escapeHtml(k.plik)}">Przywróć tę kopię</button>
+          </div>
+        </li>`).join('')
+    : '<li class="rescue-none">Nie znaleziono żadnej kopii zapasowej.</li>';
+
+  document.body.innerHTML = `
+    <div class="rescue-screen">
+      <div class="rescue-box">
+        <div class="rescue-icon">⚠</div>
+        <h1>Nie udało się odczytać przepisów</h1>
+        <p>Plik z przepisami jest uszkodzony. <strong>Nic nie zostało skasowane</strong> —
+        uszkodzony plik zachowaliśmy na dysku, a poniżej są kopie zapasowe,
+        które aplikacja robi automatycznie.</p>
+        <p class="rescue-error">${escapeHtml(odczyt.blad || '')}</p>
+        <h2>Dostępne kopie zapasowe</h2>
+        <ul class="rescue-list">${listaHtml}</ul>
+        <p class="rescue-hint">Po przywróceniu kopii aplikacja uruchomi się ponownie z odzyskanymi przepisami.</p>
+      </div>
+    </div>`;
+
+  document.querySelectorAll('.rescue-list button[data-plik]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Przywracanie…';
+      try {
+        const wynik = await window.api.przywrocKopie(btn.dataset.plik);
+        if (wynik && wynik.ok) {
+          location.reload();
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Przywróć tę kopię';
+          alert('Nie udało się przywrócić kopii: ' + ((wynik && wynik.error) || 'nieznany błąd'));
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Przywróć tę kopię';
+        alert('Nie udało się przywrócić kopii: ' + err);
+      }
+    });
+  });
+}
+
+function formatujDate(iso) {
+  if (!iso) return 'nieznana data';
+  try {
+    return new Date(iso).toLocaleString('pl-PL', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+  } catch (_) {
+    return String(iso);
+  }
 }
 
 // Normalizacja tekstu do wyszukiwania: małe litery + usunięcie polskich
@@ -237,7 +384,7 @@ function render() {
     const subLabel = subcatLabel(r.cat, r.subcat);
     card.innerHTML = `
       <button class="fav-btn ${r.favorite ? 'is-fav' : ''}" title="${r.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}">★</button>
-      <span class="tag ${r.cat}"><span class="dot"></span>${CAT_LABELS[r.cat] || r.cat}${subLabel ? ` · ${escapeHtml(subLabel)}` : ''}</span>
+      <span class="tag ${escapeHtml(r.cat)}"><span class="dot"></span>${escapeHtml(CAT_LABELS[r.cat] || r.cat)}${subLabel ? ` · ${escapeHtml(subLabel)}` : ''}</span>
       <h3>${escapeHtml(r.title)}</h3>
       <p>${escapeHtml(r.desc || '')}</p>
       <div class="meta"><span>⏱ ${escapeHtml(normalizeTime(r.time))}</span><span>${(r.ing || []).length} ${plural((r.ing || []).length, ['składnik', 'składniki', 'składników'])}</span></div>
@@ -245,7 +392,7 @@ function render() {
     card.querySelector('.fav-btn').addEventListener('click', async (e) => {
       e.stopPropagation();
       r.favorite = !r.favorite;
-      await window.api.saveRecipes(recipes);
+      await zapiszPrzepisy();
       render();
     });
     card.addEventListener('click', () => openView(r));
@@ -262,6 +409,8 @@ function customConfirm({ title, message, detail, confirmText, cancelText, danger
       overlay.className = 'modal-overlay';
       document.body.appendChild(overlay);
     }
+    // cancelText === null oznacza okno czysto informacyjne (tylko jeden przycisk)
+    const zPrzyciskiemAnuluj = cancelText !== null;
     overlay.innerHTML = `
       <div class="modal confirm-modal">
         <div class="confirm-icon ${danger ? 'danger' : ''}">${danger ? '⚠' : 'ℹ'}</div>
@@ -269,18 +418,33 @@ function customConfirm({ title, message, detail, confirmText, cancelText, danger
         <p>${message}</p>
         ${detail ? `<p class="confirm-detail">${detail}</p>` : ''}
         <div class="confirm-actions">
-          <button class="btn-secondary" id="confirmCancelBtn">${cancelText || 'Anuluj'}</button>
+          ${zPrzyciskiemAnuluj ? `<button class="btn-secondary" id="confirmCancelBtn">${cancelText || 'Anuluj'}</button>` : ''}
           <button class="${danger ? 'btn-danger' : 'btn-primary'}" id="confirmOkBtn">${confirmText || 'OK'}</button>
         </div>
       </div>
     `;
     overlay.classList.add('show');
+
     const finish = (result) => {
+      document.removeEventListener('keydown', obslugaKlawiszy, true);
       overlay.classList.remove('show');
       resolve(result);
     };
+    // Esc = anuluj, Enter = potwierdź. Dialog musi obsłużyć klawisze sam,
+    // zanim zrobi to globalna obsługa Esc dla pozostałych okien.
+    function obslugaKlawiszy(e) {
+      if (e.key === 'Escape') { e.stopPropagation(); finish(false); }
+      else if (e.key === 'Enter') { e.stopPropagation(); finish(true); }
+    }
+    document.addEventListener('keydown', obslugaKlawiszy, true);
+
     document.getElementById('confirmOkBtn').addEventListener('click', () => finish(true));
-    document.getElementById('confirmCancelBtn').addEventListener('click', () => finish(false));
+    const anuluj = document.getElementById('confirmCancelBtn');
+    if (anuluj) anuluj.addEventListener('click', () => finish(false));
+    setTimeout(() => {
+      const ok = document.getElementById('confirmOkBtn');
+      if (ok) ok.focus();
+    }, 30);
   });
 }
 
@@ -345,12 +509,18 @@ function renderConverter() {
       });
       if (!confirmed) return;
       miary = miary.filter(m => String(m.id) !== String(id));
-      await window.api.saveMiary(miary);
+      await zapiszMiary();
       renderConverter();
       showToast('Produkt usunięty z przelicznika');
     });
   });
 }
+
+function converterSnapshot() {
+  return JSON.stringify(['cf-name', 'cf-cup', 'cf-tbsp', 'cf-tsp']
+    .map(id => document.getElementById(id).value));
+}
+let converterOpenSnapshot = null;
 
 function openConverterForm(item) {
   document.getElementById('cf-id').value = item ? item.id : '';
@@ -360,6 +530,26 @@ function openConverterForm(item) {
   document.getElementById('cf-tsp').value = item ? item.tsp : '';
   document.getElementById('converterFormTitle').textContent = item ? 'Edytuj produkt' : 'Nowy produkt';
   converterFormOverlay.classList.add('show');
+  converterOpenSnapshot = converterSnapshot();
+}
+
+// To samo zabezpieczenie co przy przepisach — żeby przypadkowe zamknięcie
+// okna nie skasowało wpisanych danych.
+async function tryCloseConverterForm() {
+  const zmienione = converterOpenSnapshot !== null && converterSnapshot() !== converterOpenSnapshot;
+  if (zmienione) {
+    const proceed = await customConfirm({
+      title: 'Niezapisane zmiany',
+      message: 'Wprowadzone dane produktu nie zostały zapisane.',
+      detail: 'Zamknąć bez zapisywania?',
+      confirmText: 'Zamknij bez zapisywania',
+      cancelText: 'Wróć do edycji',
+      danger: true
+    });
+    if (!proceed) return;
+  }
+  converterFormOverlay.classList.remove('show');
+  converterOpenSnapshot = null;
 }
 
 function updateView() {
@@ -451,7 +641,7 @@ function openView(r) {
         <h2>${escapeHtml(r.title)}</h2>
         <button class="fav-btn ${r.favorite ? 'is-fav' : ''}" id="viewFavBtn" title="${r.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}">★</button>
       </div>
-      <div class="rv-meta">${CAT_LABELS[r.cat] || r.cat}${subcatLabel(r.cat, r.subcat) ? ` · ${escapeHtml(subcatLabel(r.cat, r.subcat))}` : ''} · ⏱ ${escapeHtml(normalizeTime(r.time))}</div>
+      <div class="rv-meta">${escapeHtml(CAT_LABELS[r.cat] || r.cat)}${subcatLabel(r.cat, r.subcat) ? ` · ${escapeHtml(subcatLabel(r.cat, r.subcat))}` : ''} · ⏱ ${escapeHtml(normalizeTime(r.time))}</div>
     </div>
     <div class="rv-section">
       <div class="rv-servings-row">
@@ -485,14 +675,32 @@ function openView(r) {
   `;
   viewOverlay.classList.add('show');
 
-  function renderGallery() {
+  // Zdjęcia są wczytywane z dysku dopiero tutaj, przy otwarciu przepisu.
+  // Dzięki temu plik przepisy.json pozostaje mały i szybki, niezależnie
+  // od tego, ile zdjęć jest w bazie.
+  async function renderGallery() {
     const grid = document.getElementById('galleryGrid');
+    if (!grid) return;
     const photos = r.photos || [];
     if (!photos.length) {
       grid.innerHTML = `<p class="gallery-empty">Brak zdjęć — dodaj pierwsze.</p>`;
       return;
     }
-    grid.innerHTML = photos.map((src, i) => `
+    grid.innerHTML = `<p class="gallery-empty">Wczytywanie zdjęć…</p>`;
+
+    let zrodla = [];
+    try {
+      zrodla = await window.api.loadPhotos(photos);
+    } catch (err) {
+      console.error('Nie udało się wczytać zdjęć:', err);
+    }
+
+    const pary = photos.map((nazwa, i) => ({ nazwa, i, src: zrodla[i] })).filter(x => x.src);
+    if (!pary.length) {
+      grid.innerHTML = `<p class="gallery-empty">Nie udało się wczytać zdjęć z dysku.</p>`;
+      return;
+    }
+    grid.innerHTML = pary.map(({ src, i }) => `
       <div class="gallery-item">
         <img src="${src}" data-idx="${i}">
         <button class="remove-photo" data-idx="${i}" title="Usuń zdjęcie">✕</button>
@@ -505,21 +713,40 @@ function openView(r) {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const idx = parseInt(btn.dataset.idx, 10);
+        if (!Array.isArray(r.photos) || !(idx in r.photos)) return;
         r.photos.splice(idx, 1);
-        await window.api.saveRecipes(recipes);
-        renderGallery();
+        await zapiszPrzepisy();
+        await renderGallery();
       });
     });
   }
-  renderGallery();
+  renderGallery();   // celowo bez await — galeria doczytuje się w tle
 
-  document.getElementById('addPhotosBtn').addEventListener('click', async () => {
-    const newPhotos = await window.api.pickImages();
-    if (!newPhotos.length) return;
-    r.photos = (r.photos || []).concat(newPhotos);
-    await window.api.saveRecipes(recipes);
-    renderGallery();
-    showToast(`Dodano ${newPhotos.length} ${plural(newPhotos.length, ['zdjęcie', 'zdjęcia', 'zdjęć'])}`);
+  document.getElementById('addPhotosBtn').addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true;
+    try {
+      const wynik = await window.api.pickImages();
+      if (!wynik || wynik.canceled) return;
+      if (!wynik.ok) {
+        showToast(wynik.error || 'Nie udało się dodać zdjęć', true);
+        return;
+      }
+      const nazwy = wynik.nazwy || [];
+      r.photos = (r.photos || []).concat(nazwy);
+      await zapiszPrzepisy();
+      await renderGallery();
+      let info = `Dodano ${nazwy.length} ${plural(nazwy.length, ['zdjęcie', 'zdjęcia', 'zdjęć'])}`;
+      if (wynik.bledy && wynik.bledy.length) {
+        info += ` (nie udało się dodać: ${wynik.bledy.length})`;
+      }
+      showToast(info);
+    } catch (err) {
+      console.error(err);
+      showToast('Nie udało się dodać zdjęć', true);
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   function renderIng() {
@@ -553,7 +780,7 @@ function openView(r) {
     r.favorite = !r.favorite;
     e.target.classList.toggle('is-fav', r.favorite);
     e.target.title = r.favorite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych';
-    await window.api.saveRecipes(recipes);
+    await zapiszPrzepisy();
     render();
   });
 
@@ -591,18 +818,38 @@ function openView(r) {
     const confirmed = await customConfirm({
       title: 'Potwierdź usunięcie',
       message: `Usunąć przepis „${escapeHtml(r.title)}”?`,
-      detail: 'Tej operacji nie można cofnąć.',
+      detail: 'Przepis trafi do kosza i przez 30 dni będzie można go przywrócić.',
       confirmText: 'Usuń',
       cancelText: 'Anuluj',
       danger: true
     });
     if (!confirmed) return;
+
+    // Najpierw kopia do kosza, dopiero potem usunięcie z listy — gdyby zapis
+    // kosza się nie udał, przepis zostaje nietknięty.
+    try {
+      const doKosza = await window.api.doKosza(r);
+      if (!doKosza || !doKosza.ok) {
+        showToast('Nie udało się usunąć przepisu', true);
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Nie udało się usunąć przepisu', true);
+      return;
+    }
+
+    const kopiaListy = recipes.slice();
     recipes = recipes.filter(x => String(x.id) !== String(r.id));
-    await window.api.saveRecipes(recipes);
+    const zapisano = await zapiszPrzepisy();
+    if (!zapisano) {
+      recipes = kopiaListy;   // cofamy zmianę w pamięci, żeby ekran zgadzał się z dyskiem
+      return;
+    }
     viewOverlay.classList.remove('show');
     renderCatTree();
     render();
-    showToast('Przepis usunięty');
+    showToast('Przepis przeniesiony do kosza');
   });
 }
 viewOverlay.addEventListener('click', (e) => { if (e.target === viewOverlay) viewOverlay.classList.remove('show'); });
@@ -737,11 +984,14 @@ recipeForm.addEventListener('submit', async (e) => {
   };
 
   if (!idValue) {
-    const normTitle = data.title.trim().toLowerCase().replace(/\s+/g, ' ');
-    const dup = recipes.find(r => {
-      const rn = r.title.trim().toLowerCase().replace(/\s+/g, ' ');
-      return rn === normTitle || rn.includes(normTitle) || normTitle.includes(rn);
-    });
+    // Wykrywanie duplikatów: wcześniej używane `includes` w obie strony było
+    // zbyt agresywne — przepis „Zupa” w bazie powodował ostrzeżenie przy
+    // KAŻDEJ „Zupie pomidorowej”, „Zupie ogórkowej” itd. Teraz ostrzegamy
+    // tylko przy tytule praktycznie identycznym (po pominięciu wielkości
+    // liter, polskich znaków i znaków interpunkcyjnych).
+    const uprosc = (t) => normalizeSearchPl(t).replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+    const normTitle = uprosc(data.title);
+    const dup = normTitle ? recipes.find(r => uprosc(r.title) === normTitle) : null;
     if (dup) {
       const proceed = await customConfirm({
         title: 'Podobny przepis już istnieje',
@@ -762,7 +1012,7 @@ recipeForm.addEventListener('submit', async (e) => {
     recipes.unshift({ id: Date.now(), favorite: false, ...data });
   }
 
-  await window.api.saveRecipes(recipes);
+  await zapiszPrzepisy();
   addOverlay.classList.remove('show');
   formOpenSnapshot = null;
   activeCat = 'wszystkie';
@@ -774,8 +1024,8 @@ recipeForm.addEventListener('submit', async (e) => {
 
 /* ---------- PRZELICZNIK: DODAWANIE / EDYCJA PRODUKTU ---------- */
 document.getElementById('converterAddBtn').addEventListener('click', () => openConverterForm(null));
-document.getElementById('closeConverterForm').addEventListener('click', () => converterFormOverlay.classList.remove('show'));
-converterFormOverlay.addEventListener('click', (e) => { if (e.target === converterFormOverlay) converterFormOverlay.classList.remove('show'); });
+document.getElementById('closeConverterForm').addEventListener('click', tryCloseConverterForm);
+converterFormOverlay.addEventListener('click', (e) => { if (e.target === converterFormOverlay) tryCloseConverterForm(); });
 
 converterForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -794,10 +1044,278 @@ converterForm.addEventListener('submit', async (e) => {
     miary.push({ id: Date.now(), ...data });
   }
 
-  await window.api.saveMiary(miary);
+  await zapiszMiary();
   converterFormOverlay.classList.remove('show');
+  converterOpenSnapshot = null;
   renderConverter();
   showToast(idValue ? 'Produkt zaktualizowany' : 'Produkt dodany do przelicznika');
 });
 
+
+/* ==========================================================================
+   KOSZ — usunięte przepisy można odzyskać przez 30 dni
+   ========================================================================== */
+
+const koszOverlay = document.getElementById('koszOverlay');
+
+async function otworzKosz() {
+  let kosz = [];
+  try {
+    kosz = await window.api.loadKosz();
+  } catch (err) {
+    console.error('Nie udało się wczytać kosza:', err);
+    showToast('Nie udało się otworzyć kosza', true);
+    return;
+  }
+
+  const modal = document.getElementById('koszModal');
+  const listaHtml = kosz.length
+    ? kosz.map(w => `
+        <li class="kosz-item" data-id="${escapeHtml(String(w.id))}">
+          <div class="kosz-info">
+            <strong>${escapeHtml(w.title || 'Bez tytułu')}</strong>
+            <span class="kosz-meta">usunięto ${formatujDate(w.usunietoDnia)} · zostało ${dniDoUsuniecia(w.usunietoDnia)}</span>
+          </div>
+          <div class="kosz-akcje">
+            <button class="btn-secondary kosz-przywroc">Przywróć</button>
+            <button class="btn-danger kosz-usun">Usuń trwale</button>
+          </div>
+        </li>`).join('')
+    : '<li class="kosz-pusty">Kosz jest pusty.</li>';
+
+  modal.innerHTML = `
+    <div class="modal-head">
+      <h2>Kosz</h2>
+      <button class="icon-btn" id="closeKosz">✕</button>
+    </div>
+    <p class="kosz-opis">Usunięte przepisy są tu przechowywane przez 30 dni, a potem znikają automatycznie.</p>
+    <ul class="kosz-lista">${listaHtml}</ul>
+    ${kosz.length ? '<button class="btn-danger btn-block" id="oproznijKoszBtn">Opróżnij cały kosz</button>' : ''}
+  `;
+  koszOverlay.classList.add('show');
+
+  document.getElementById('closeKosz').addEventListener('click', () => koszOverlay.classList.remove('show'));
+
+  modal.querySelectorAll('.kosz-przywroc').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('.kosz-item').dataset.id;
+      btn.disabled = true;
+      try {
+        const wynik = await window.api.przywrocZKosza(id);
+        if (wynik && wynik.ok) {
+          const odczyt = await window.api.loadRecipes();
+          recipes = (odczyt && odczyt.przepisy) || recipes;
+          renderCatTree();
+          render();
+          showToast('Przepis przywrócony');
+          otworzKosz();
+        } else {
+          btn.disabled = false;
+          showToast((wynik && wynik.error) || 'Nie udało się przywrócić przepisu', true);
+        }
+      } catch (err) {
+        btn.disabled = false;
+        console.error(err);
+        showToast('Nie udało się przywrócić przepisu', true);
+      }
+    });
+  });
+
+  modal.querySelectorAll('.kosz-usun').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const el = btn.closest('.kosz-item');
+      const id = el.dataset.id;
+      const nazwa = el.querySelector('strong').textContent;
+      const potwierdzone = await customConfirm({
+        title: 'Usunąć bezpowrotnie?',
+        message: `Przepis „${escapeHtml(nazwa)}” zostanie usunięty na zawsze.`,
+        detail: 'Tej operacji nie da się już cofnąć.',
+        confirmText: 'Usuń na zawsze',
+        cancelText: 'Anuluj',
+        danger: true
+      });
+      if (!potwierdzone) return;
+      await window.api.usunTrwale(id);
+      otworzKosz();
+    });
+  });
+
+  const oproznij = document.getElementById('oproznijKoszBtn');
+  if (oproznij) {
+    oproznij.addEventListener('click', async () => {
+      const potwierdzone = await customConfirm({
+        title: 'Opróżnić kosz?',
+        message: `Wszystkie przepisy w koszu (${kosz.length}) zostaną usunięte na zawsze.`,
+        detail: 'Tej operacji nie da się cofnąć.',
+        confirmText: 'Opróżnij kosz',
+        cancelText: 'Anuluj',
+        danger: true
+      });
+      if (!potwierdzone) return;
+      await window.api.oproznijKosz();
+      otworzKosz();
+      showToast('Kosz opróżniony');
+    });
+  }
+}
+
+function dniDoUsuniecia(iso) {
+  const czas = Date.parse(iso);
+  if (!Number.isFinite(czas)) return '30 dni';
+  const dni = Math.max(0, 30 - Math.floor((Date.now() - czas) / (24 * 3600 * 1000)));
+  return `${dni} ${plural(dni, ['dzień', 'dni', 'dni'])}`;
+}
+
+koszOverlay.addEventListener('click', (e) => { if (e.target === koszOverlay) koszOverlay.classList.remove('show'); });
+
+/* ==========================================================================
+   USTAWIENIA — kopia bazy, import, przywracanie kopii zapasowych
+   ========================================================================== */
+
+const ustawieniaOverlay = document.getElementById('ustawieniaOverlay');
+
+async function otworzUstawienia() {
+  const modal = document.getElementById('ustawieniaModal');
+  modal.innerHTML = `
+    <div class="modal-head">
+      <h2>Kopie i dane</h2>
+      <button class="icon-btn" id="closeUstawienia">✕</button>
+    </div>
+
+    <div class="ust-sekcja">
+      <h4>Kopia całej bazy</h4>
+      <p class="ust-opis">Zapisz wszystkie przepisy, zdjęcia i tabelę przelicznika do jednego pliku —
+      możesz go trzymać na pendrivie albo przenieść na inny komputer.</p>
+      <div class="ust-przyciski">
+        <button class="btn-primary" id="eksportBazyBtn">Zapisz kopię bazy…</button>
+        <button class="btn-secondary" id="importBazyBtn">Wczytaj kopię z pliku…</button>
+      </div>
+    </div>
+
+    <div class="ust-sekcja">
+      <h4>Automatyczne kopie zapasowe</h4>
+      <p class="ust-opis">Aplikacja sama robi kopię przy każdym uruchomieniu i pamięta 5 ostatnich.
+      Jeśli coś pójdzie nie tak, możesz wrócić do wcześniejszej wersji.</p>
+      <ul class="ust-kopie" id="listaKopii"><li class="ust-ladowanie">Wczytywanie…</li></ul>
+    </div>
+
+    <div class="ust-sekcja">
+      <h4>Gdzie leżą Twoje dane</h4>
+      <p class="ust-sciezka">${escapeHtml(stanAplikacji.folderDanych || 'nieznana lokalizacja')}</p>
+      <button class="btn-secondary" id="otworzFolderBtn">Otwórz ten folder</button>
+    </div>
+  `;
+  ustawieniaOverlay.classList.add('show');
+
+  document.getElementById('closeUstawienia').addEventListener('click', () => ustawieniaOverlay.classList.remove('show'));
+
+  document.getElementById('otworzFolderBtn').addEventListener('click', () => window.api.pokazFolderDanych());
+
+  document.getElementById('eksportBazyBtn').addEventListener('click', async (e) => {
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = 'Zapisywanie…';
+    try {
+      const wynik = await window.api.exportBaze();
+      if (wynik && wynik.ok) {
+        showToast(`Zapisano kopię (${wynik.liczbaPrzepisow} ${plural(wynik.liczbaPrzepisow, ['przepis', 'przepisy', 'przepisów'])})`);
+      } else if (!wynik || !wynik.canceled) {
+        showToast((wynik && wynik.error) || 'Nie udało się zapisać kopii', true);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Nie udało się zapisać kopii', true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Zapisz kopię bazy…';
+    }
+  });
+
+  document.getElementById('importBazyBtn').addEventListener('click', async () => {
+    const potwierdzone = await customConfirm({
+      title: 'Wczytać kopię z pliku?',
+      message: 'Obecne przepisy zostaną zastąpione zawartością wybranego pliku.',
+      detail: 'Zanim to nastąpi, aplikacja automatycznie zrobi kopię zapasową obecnego stanu.',
+      confirmText: 'Wybierz plik…',
+      cancelText: 'Anuluj',
+      danger: true
+    });
+    if (!potwierdzone) return;
+    try {
+      const wynik = await window.api.importBaze();
+      if (wynik && wynik.ok) {
+        showToast(`Wczytano ${wynik.liczbaPrzepisow} ${plural(wynik.liczbaPrzepisow, ['przepis', 'przepisy', 'przepisów'])}`);
+        setTimeout(() => location.reload(), 900);
+      } else if (!wynik || !wynik.canceled) {
+        showToast((wynik && wynik.error) || 'Nie udało się wczytać kopii', true);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Nie udało się wczytać kopii', true);
+    }
+  });
+
+  // lista automatycznych kopii
+  try {
+    const kopie = await window.api.listaKopii();
+    const ul = document.getElementById('listaKopii');
+    if (!ul) return;
+    ul.innerHTML = kopie.length
+      ? kopie.map(k => `
+          <li>
+            <div class="ust-kopia">
+              <div>
+                <strong>${formatujDate(k.data)}</strong>
+                <span class="ust-kopia-meta">${k.liczbaPrzepisow} ${plural(k.liczbaPrzepisow, ['przepis', 'przepisy', 'przepisów'])}</span>
+              </div>
+              <button class="btn-secondary" data-plik="${escapeHtml(k.plik)}">Przywróć</button>
+            </div>
+          </li>`).join('')
+      : '<li class="ust-ladowanie">Brak kopii — pierwsza powstanie przy kolejnym uruchomieniu.</li>';
+
+    ul.querySelectorAll('button[data-plik]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const potwierdzone = await customConfirm({
+          title: 'Przywrócić tę kopię?',
+          message: 'Obecne przepisy zostaną zastąpione zawartością wybranej kopii.',
+          detail: 'Obecny plik zostanie zachowany obok, więc nic nie przepadnie bezpowrotnie.',
+          confirmText: 'Przywróć',
+          cancelText: 'Anuluj',
+          danger: true
+        });
+        if (!potwierdzone) return;
+        const wynik = await window.api.przywrocKopie(btn.dataset.plik);
+        if (wynik && wynik.ok) {
+          showToast(`Przywrócono ${wynik.liczba} ${plural(wynik.liczba, ['przepis', 'przepisy', 'przepisów'])}`);
+          setTimeout(() => location.reload(), 900);
+        } else {
+          showToast((wynik && wynik.error) || 'Nie udało się przywrócić kopii', true);
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Nie udało się pobrać listy kopii:', err);
+  }
+}
+
+ustawieniaOverlay.addEventListener('click', (e) => { if (e.target === ustawieniaOverlay) ustawieniaOverlay.classList.remove('show'); });
+
+document.getElementById('koszBtn').addEventListener('click', otworzKosz);
+document.getElementById('ustawieniaBtn').addEventListener('click', otworzUstawienia);
+
+/* ==========================================================================
+   KLAWISZ ESC — zamyka wierzchnie okno
+   ========================================================================== */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const confirmOverlay = document.getElementById('confirmOverlay');
+  if (confirmOverlay && confirmOverlay.classList.contains('show')) return; // dialog ma własną obsługę
+  if (addOverlay.classList.contains('show')) { tryCloseForm(); return; }
+  if (converterFormOverlay.classList.contains('show')) { tryCloseConverterForm(); return; }
+  if (ustawieniaOverlay.classList.contains('show')) { ustawieniaOverlay.classList.remove('show'); return; }
+  if (koszOverlay.classList.contains('show')) { koszOverlay.classList.remove('show'); return; }
+  if (viewOverlay.classList.contains('show')) { viewOverlay.classList.remove('show'); }
+});
+
 init();
+
