@@ -660,6 +660,21 @@ document.getElementById('f-cat').addEventListener('change', (e) => {
   populateSubcatOptions(e.target.value, '');
 });
 
+function formSnapshot() {
+  return JSON.stringify([
+    document.getElementById('f-title').value,
+    document.getElementById('f-cat').value,
+    document.getElementById('f-subcat').value,
+    document.getElementById('f-time').value,
+    document.getElementById('f-desc').value,
+    document.getElementById('f-servings').value,
+    document.getElementById('f-ing').value,
+    document.getElementById('f-steps').value,
+    document.getElementById('f-notes').value
+  ]);
+}
+let formOpenSnapshot = null;
+
 function openForm(recipe) {
   recipeForm.reset();
   if (recipe) {
@@ -681,11 +696,30 @@ function openForm(recipe) {
     populateSubcatOptions('', '');
   }
   addOverlay.classList.add('show');
+  formOpenSnapshot = formSnapshot();
 }
 
 document.getElementById('addBtn').addEventListener('click', () => openForm(null));
-document.getElementById('closeAdd').addEventListener('click', () => addOverlay.classList.remove('show'));
-addOverlay.addEventListener('click', (e) => { if (e.target === addOverlay) addOverlay.classList.remove('show'); });
+
+async function tryCloseForm() {
+  const isDirty = formOpenSnapshot !== null && formSnapshot() !== formOpenSnapshot;
+  if (isDirty) {
+    const proceed = await customConfirm({
+      title: 'Niezapisane zmiany',
+      message: 'Wprowadzone dane w przepisie nie zostały zapisane.',
+      detail: 'Zamknąć bez zapisywania?',
+      confirmText: 'Zamknij bez zapisywania',
+      cancelText: 'Wróć do edycji',
+      danger: true
+    });
+    if (!proceed) return;
+  }
+  addOverlay.classList.remove('show');
+  formOpenSnapshot = null;
+}
+
+document.getElementById('closeAdd').addEventListener('click', tryCloseForm);
+addOverlay.addEventListener('click', (e) => { if (e.target === addOverlay) tryCloseForm(); });
 
 recipeForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -730,6 +764,7 @@ recipeForm.addEventListener('submit', async (e) => {
 
   await window.api.saveRecipes(recipes);
   addOverlay.classList.remove('show');
+  formOpenSnapshot = null;
   activeCat = 'wszystkie';
   activeSubcat = null;
   renderCatTree();
