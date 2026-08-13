@@ -155,9 +155,59 @@ async function exportRecipeToDocx(recipe) {
   }
 }
 
-// Plik z przepisami trzymamy w standardowym folderze danych aplikacji
-// (np. na Windows: C:\Users\Ty\AppData\Roaming\Ksiazka Kucharska\przepisy.json)
-const DATA_FILE = path.join(app.getPath('userData'), 'przepisy.json');
+// Gdzie trzymamy dane (przepisy, migracje, przelicznik miar).
+//
+// Aplikacja jest budowana jako "portable" .exe, więc Electron ustawia
+// zmienną PORTABLE_EXECUTABLE_DIR na folder, w którym leży plik .exe.
+// Dzięki temu dane mogą siedzieć w podfolderze "dane-aplikacji" obok
+// samego programu, a nie w ukrytym AppData — wystarczy skopiować cały
+// folder (.exe + dane-aplikacji) na pendrive albo inny komputer, żeby
+// przenieść wszystkie przepisy i tabelę przelicznika miar.
+//
+// Jeśli z jakiegoś powodu nie da się zapisać obok .exe (np. folder
+// tylko do odczytu, uruchomienie z płyty itp.), aplikacja po cichu
+// wraca do standardowego folderu danych (AppData\Roaming), żeby nigdy
+// nie stracić możliwości zapisu.
+function getDataDir() {
+  const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
+  if (portableDir) {
+    const folder = path.join(portableDir, 'dane-aplikacji');
+    try {
+      fs.mkdirSync(folder, { recursive: true });
+      fs.accessSync(folder, fs.constants.W_OK);
+      return folder;
+    } catch (err) {
+      console.error('Nie udało się użyć folderu "dane-aplikacji" obok programu, wracam do domyślnego folderu danych:', err);
+    }
+  }
+  return app.getPath('userData');
+}
+
+const DATA_DIR = getDataDir();
+
+// Jednorazowa migracja: jeśli to pierwsze uruchomienie z nowym folderem
+// "dane-aplikacji" obok .exe, a w starym (ukrytym) folderze AppData są
+// już jakieś dane z wcześniejszej wersji programu, przenosimy je, żeby
+// nikt nie stracił swoich przepisów po aktualizacji.
+(function migrujZeStaregoFolderu() {
+  const staryFolder = app.getPath('userData');
+  if (path.normalize(DATA_DIR) === path.normalize(staryFolder)) return;
+  ['przepisy.json', 'migracje.json', 'przelicznik-miar.json'].forEach(nazwa => {
+    const stary = path.join(staryFolder, nazwa);
+    const nowy = path.join(DATA_DIR, nazwa);
+    try {
+      if (fs.existsSync(stary) && !fs.existsSync(nowy)) {
+        fs.copyFileSync(stary, nowy);
+      }
+    } catch (err) {
+      console.error(`Nie udało się przenieść pliku ${nazwa} do folderu obok programu:`, err);
+    }
+  });
+})();
+
+// Plik z przepisami trzymamy w folderze danych ustalonym powyżej
+// (domyślnie obok .exe, w podfolderze dane-aplikacji\przepisy.json)
+const DATA_FILE = path.join(DATA_DIR, 'przepisy.json');
 
 const DOMYSLNE_PRZEPISY = [
   {
@@ -262,7 +312,7 @@ function writeRecipes(recipes) {
 
 // Plik śledzący jednorazowe migracje danych (żeby nic nie dublować/wracało
 // po usunięciu przez użytkownika)
-const MIGRATIONS_FILE = path.join(app.getPath('userData'), 'migracje.json');
+const MIGRATIONS_FILE = path.join(DATA_DIR, 'migracje.json');
 
 function readMigracje() {
   try {
@@ -283,7 +333,7 @@ function writeMigracje(migracje) {
 }
 
 // Plik z tabelą przelicznika miar i wag (edytowalny przez użytkownika)
-const MIARY_FILE = path.join(app.getPath('userData'), 'przelicznik-miar.json');
+const MIARY_FILE = path.join(DATA_DIR, 'przelicznik-miar.json');
 
 const DOMYSLNE_MIARY = [
   { id: 1, name: 'Bułka tarta', cup: '150 g', tbsp: '9 g', tsp: '3 g' },
