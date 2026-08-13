@@ -29,6 +29,14 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 h1,h2,h3{font-family:'Manrope', sans-serif;}
+/* Przeglądarki domyślnie NIE dziedziczą czcionki strony w polach
+   formularza (button/input/select/textarea) — bez tego resetu renderują
+   się systemową czcionką UI, o innych metrykach niż Inter/Manrope, co
+   psuje pionowe wyrównanie ikon/tekstu obok zwykłych elementów (np.
+   gwiazdka ulubionych obok tytułu przepisu). */
+button, input, select, textarea{
+  font-family:inherit;
+}
 
 .app{
   display:grid;
@@ -43,13 +51,8 @@ h1,h2,h3{font-family:'Manrope', sans-serif;}
   display:flex;
   flex-direction:column;
   padding:24px 16px;
-  overflow-y:auto;
-  overflow-x:hidden;
-  scrollbar-width:none;      /* Firefox */
-  -ms-overflow-style:none;   /* starsze Edge/IE */
-}
-.sidebar::-webkit-scrollbar{
-  display:none;              /* Chrome/Edge/Electron */
+  overflow:hidden;           /* przewija się sama lista kategorii, nie cały pasek */
+  min-height:0;
 }
 .brand{
   display:flex;
@@ -70,7 +73,21 @@ h1,h2,h3{font-family:'Manrope', sans-serif;}
   letter-spacing:-0.01em;
 }
 
-.cat-list{display:flex; flex-direction:column; gap:2px;}
+.cat-list{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  /* pasek przewijania jest ukryty, ale przewijanie kółkiem myszy działa */
+  scrollbar-width:none;      /* Firefox */
+  -ms-overflow-style:none;   /* starsze Edge/IE */
+}
+.cat-list::-webkit-scrollbar{
+  display:none;              /* Chrome/Edge/Electron */
+}
 .cat-item{
   display:flex; align-items:center; gap:10px;
   background:none; border:none;
@@ -237,7 +254,7 @@ h1,h2,h3{font-family:'Manrope', sans-serif;}
   align-items:center;
   gap:10px;
 }
-.rv-title-row .fav-btn{position:static; font-size:1.3rem;}
+.rv-title-row .fav-btn{position:static; font-size:1.3rem; line-height:1; transform:translateY(-1px);}
 .rv-servings-row{
   display:flex;
   justify-content:space-between;
@@ -379,6 +396,7 @@ h1,h2,h3{font-family:'Manrope', sans-serif;}
   padding:3px 9px;
   border-radius:20px;
   margin-bottom:10px;
+  max-width:calc(100% - 34px); /* zostawia miejsce na przycisk ★ w rogu karty (.fav-btn) */
 }
 .tag .dot{width:6px;height:6px;border-radius:50%;}
 .tag.sniadania{background:#FBF0DF; color:var(--c-sniadania);}
@@ -704,4 +722,227 @@ h1,h2,h3{font-family:'Manrope', sans-serif;}
 .conv-row-actions .icon-btn{
   width:26px; height:26px;
   font-size:13px;
+}
+
+/* ==========================================================================
+   PASEK TRYBU TYLKO DO ODCZYTU
+   ========================================================================== */
+.readonly-bar{
+  background:#8A2B2B;
+  color:#fff;
+  font-family:'Inter', sans-serif;
+  font-size:0.82rem;
+  font-weight:600;
+  padding:9px 16px;
+  text-align:center;
+}
+.readonly-bar[hidden]{display:none;}
+body.tryb-tylko-odczyt .app{height:calc(100vh - 38px);}
+body.tryb-tylko-odczyt .btn-primary:disabled,
+body.tryb-tylko-odczyt .btn-secondary:disabled{opacity:.5; cursor:not-allowed;}
+
+/* ==========================================================================
+   NARZĘDZIA W PASKU BOCZNYM (kosz, kopie i dane)
+   ========================================================================== */
+.sidebar-tools{
+  margin-top:12px;
+  padding-top:14px;
+  border-top:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  flex:none;
+}
+.tool-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:none;
+  border:none;
+  text-align:left;
+  font-family:'Inter', sans-serif;
+  font-size:0.86rem;
+  font-weight:500;
+  color:var(--text-soft);
+  padding:9px 10px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.tool-item:hover{background:var(--bg); color:var(--text);}
+.tool-icon{
+  width:16px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:0.95rem;
+  flex:none;
+}
+
+/* ==========================================================================
+   WSKAŹNIK ZAPISU
+   ========================================================================== */
+.save-status{
+  font-family:'Inter', sans-serif;
+  font-size:0.78rem;
+  font-weight:600;
+  padding:5px 12px;
+  border-radius:20px;
+  margin:-14px 0 18px;
+  display:inline-block;
+}
+.save-status[hidden]{display:none;}
+.save-status.trwa{background:var(--border); color:var(--text-soft);}
+.save-status.ok{background:var(--accent-soft); color:var(--accent);}
+.save-status.blad{background:#F6DDDD; color:#8A2B2B;}
+
+/* ==========================================================================
+   EKRAN RATUNKOWY (uszkodzona baza)
+   ========================================================================== */
+.rescue-screen{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:32px;
+  background:var(--bg);
+}
+.rescue-box{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:36px 40px;
+  max-width:640px;
+  width:100%;
+  box-shadow:0 20px 50px rgba(0,0,0,0.10);
+}
+.rescue-icon{
+  font-size:32px;
+  color:#B0522F;
+  margin-bottom:10px;
+}
+.rescue-box h1{font-size:1.35rem; margin:0 0 12px;}
+.rescue-box h2{font-size:0.95rem; margin:26px 0 10px;}
+.rescue-box p{font-size:0.9rem; line-height:1.55; color:var(--text-soft); margin:0 0 12px;}
+.rescue-error{
+  font-family:monospace;
+  font-size:0.78rem !important;
+  background:var(--bg);
+  border-radius:8px;
+  padding:10px 12px;
+  word-break:break-word;
+}
+.rescue-list{list-style:none; padding:0; margin:0;}
+.rescue-list li{margin-bottom:8px;}
+.rescue-copy{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px 14px;
+}
+.rescue-count{
+  display:block;
+  font-size:0.8rem;
+  color:var(--text-soft);
+  margin-top:2px;
+}
+.rescue-none, .kosz-pusty, .ust-ladowanie{
+  color:var(--text-soft);
+  font-size:0.88rem;
+  padding:10px 0;
+  list-style:none;
+}
+.rescue-hint{font-size:0.82rem !important; margin-top:16px !important;}
+
+/* ekran krytycznego błędu startu */
+.fatal-screen{
+  max-width:620px;
+  margin:80px auto;
+  padding:32px;
+  font-family:'Inter', sans-serif;
+}
+.fatal-screen h1{font-size:1.3rem; margin:0 0 14px;}
+.fatal-screen p{line-height:1.6; color:var(--text-soft);}
+.fatal-detail{
+  font-family:monospace;
+  font-size:0.8rem;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:10px 12px;
+  word-break:break-word;
+}
+
+/* ==========================================================================
+   KOSZ
+   ========================================================================== */
+.kosz-opis, .ust-opis{
+  font-size:0.86rem;
+  color:var(--text-soft);
+  line-height:1.5;
+  margin:0 0 16px;
+}
+.kosz-lista{list-style:none; padding:0; margin:0 0 18px;}
+.kosz-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:12px 14px;
+  margin-bottom:8px;
+}
+.kosz-info strong{font-family:'Manrope', sans-serif; font-size:0.95rem;}
+.kosz-meta{
+  display:block;
+  font-size:0.78rem;
+  color:var(--text-soft);
+  margin-top:3px;
+}
+.kosz-akcje{display:flex; gap:8px; flex:none;}
+
+/* ==========================================================================
+   KOPIE I DANE
+   ========================================================================== */
+.ust-sekcja{
+  padding:18px 0;
+  border-bottom:1px solid var(--border);
+}
+.ust-sekcja:last-child{border-bottom:none;}
+.ust-sekcja h4{
+  font-family:'Manrope', sans-serif;
+  font-size:0.95rem;
+  margin:0 0 8px;
+}
+.ust-przyciski{display:flex; gap:10px; flex-wrap:wrap;}
+.ust-kopie{list-style:none; padding:0; margin:0;}
+.ust-kopie li{margin-bottom:8px;}
+.ust-kopia{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 14px;
+}
+.ust-kopia strong{font-size:0.88rem;}
+.ust-kopia-meta{
+  display:block;
+  font-size:0.78rem;
+  color:var(--text-soft);
+  margin-top:2px;
+}
+.ust-sciezka{
+  font-family:monospace;
+  font-size:0.8rem;
+  background:var(--bg);
+  border-radius:8px;
+  padding:10px 12px;
+  word-break:break-all;
+  margin:0 0 12px;
+  color:var(--text);
 }
