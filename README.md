@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/31021025/README.md)
 # Książka Kucharska — aplikacja desktopowa
 
 Prosta, płaska (flat design) aplikacja do przechowywania przepisów. Dane zapisują się
