@@ -406,7 +406,7 @@ function openView(r) {
         </div>
       </div>
       <ul class="rv-ing" id="rvIngList"></ul>
-      <button class="copy-link" id="copyIngBtn">📋 Kopiuj składniki (do wklejenia w Google Keep)</button>
+      <button class="copy-link" id="copyIngBtn">📋 Skopiuj do swojej listy zakupów</button>
     </div>
     <div class="rv-section">
       <h4>Przygotowanie</h4>
@@ -484,7 +484,7 @@ function openView(r) {
     const text = (r.ing || []).map(i => scaleIngredientText(i, factor)).join('\n');
     try {
       await navigator.clipboard.writeText(text);
-      showToast('Skopiowano — wklej (Ctrl+V) w nowej liście w Google Keep');
+      showToast('Skopiowano — wklej (Ctrl+V) w swojej liście zakupów');
     } catch (err) {
       console.error(err);
       showToast('Nie udało się skopiować do schowka', true);
