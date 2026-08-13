@@ -146,6 +146,64 @@ async function init() {
   render();
 }
 
+// Normalizacja tekstu do wyszukiwania: małe litery + usunięcie polskich
+// (i innych) znaków diakrytycznych, żeby "zurek" znajdowało "Żurek",
+// a "smietana" znajdowało "Śmietana".
+function normalizeSearch(str) {
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, ''); // usuwa akcenty (ż→z, ć→c, ł→l zostaje niżej)
+}
+// "ł" nie jest zapisywane jako litera + akcent w Unicode, trzeba osobno
+function normalizeSearchPl(str) {
+  return normalizeSearch(str).replace(/ł/g, 'l');
+}
+
+// Odległość Levenshteina — do tolerowania drobnych literówek
+// (jedna pomyłka, przestawiona/brakująca litera itp.)
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const prev = new Array(n + 1);
+  const curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+    }
+    for (let j = 0; j <= n; j++) prev[j] = curr[j];
+  }
+  return prev[n];
+}
+
+// Sprawdza, czy termin wyszukiwania pasuje do tekstu — dokładnie (substring)
+// albo w przybliżeniu (tolerancja literówek), słowo po słowie.
+function fuzzyMatch(text, term) {
+  if (!term) return true;
+  const normText = normalizeSearchPl(text);
+  const normTerm = normalizeSearchPl(term);
+  if (normText.includes(normTerm)) return true;
+
+  // tolerancja literówek: porówaj każde słowo z tekstu z każdym słowem
+  // zapytania, dopuszczając 1 różnicę (2 przy dłuższych słowach)
+  const textWords = normText.split(/[^a-z0-9]+/).filter(Boolean);
+  const termWords = normTerm.split(/[^a-z0-9]+/).filter(Boolean);
+  return termWords.every(tw => {
+    if (tw.length < 3) return textWords.some(w => w.includes(tw));
+    const maxDist = tw.length >= 6 ? 2 : 1;
+    return textWords.some(w => {
+      if (w.includes(tw)) return true;
+      if (Math.abs(w.length - tw.length) > maxDist) return false;
+      return levenshtein(w, tw) <= maxDist;
+    });
+  });
+}
+
 function filteredRecipes() {
   let list = recipes.filter(r => {
     const matchCat = activeCat === 'wszystkie'
@@ -153,10 +211,10 @@ function filteredRecipes() {
       : activeCat === 'ulubione'
         ? !!r.favorite
         : r.cat === activeCat && (!activeSubcat || r.subcat === activeSubcat);
-    const term = searchTerm.trim().toLowerCase();
+    const term = searchTerm.trim();
     const matchSearch = !term
-      || r.title.toLowerCase().includes(term)
-      || subcatLabel(r.cat, r.subcat).toLowerCase().includes(term);
+      || fuzzyMatch(r.title, term)
+      || fuzzyMatch(subcatLabel(r.cat, r.subcat), term);
     return matchCat && matchSearch;
   });
 
@@ -247,9 +305,9 @@ function escapeHtml(str) {
 }
 
 function renderConverter() {
-  const term = searchTerm.trim().toLowerCase();
+  const term = searchTerm.trim();
   const rows = miary
-    .filter(m => !term || m.name.toLowerCase().includes(term))
+    .filter(m => fuzzyMatch(m.name, term))
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name, 'pl'));
   converterBody.innerHTML = rows.map(m => `
