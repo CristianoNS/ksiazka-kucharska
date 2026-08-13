@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "com.domowe.ksiazkakucharska",
-    "productName": "Ksiazka Kucharska",
+    "productName": "Książka Kucharska",
     "directories": {
       "output": "dist"
     },
