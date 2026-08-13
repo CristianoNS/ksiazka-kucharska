@@ -43,6 +43,8 @@ h1,h2,h3{font-family:'Manrope', sans-serif;}
   display:flex;
   flex-direction:column;
   padding:24px 16px;
+  overflow-y:auto;
+  overflow-x:hidden;
 }
 .brand{
   display:flex;
