@@ -8,6 +8,8 @@
 </head>
 <body>
 
+<div class="readonly-bar" id="readonlyBar" hidden></div>
+
 <div class="app">
 
   <aside class="sidebar">
@@ -30,6 +32,15 @@
       <div class="cat-divider"></div>
       <div id="catTree"></div>
     </nav>
+
+    <div class="sidebar-tools">
+      <button class="tool-item" id="koszBtn" title="Usunięte przepisy z ostatnich 30 dni">
+        <span class="tool-icon">🗑</span> Kosz
+      </button>
+      <button class="tool-item" id="ustawieniaBtn" title="Kopie zapasowe i dane aplikacji">
+        <span class="tool-icon">⛭</span> Kopie i dane
+      </button>
+    </div>
   </aside>
 
   <main class="content">
@@ -42,6 +53,7 @@
       </select>
       <button class="btn-primary" id="addBtn">+ Dodaj przepis</button>
     </div>
+    <div class="save-status" id="saveStatus" hidden></div>
 
     <div class="grid" id="grid"></div>
     <div class="empty" id="emptyState" hidden>
@@ -179,8 +191,19 @@
   </div>
 </div>
 
+<!-- MODAL: kosz -->
+<div class="modal-overlay" id="koszOverlay">
+  <div class="modal" id="koszModal"></div>
+</div>
+
+<!-- MODAL: kopie zapasowe i dane -->
+<div class="modal-overlay" id="ustawieniaOverlay">
+  <div class="modal" id="ustawieniaModal"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
+<script src="../common.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
